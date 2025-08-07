@@ -9,6 +9,8 @@ import Sidebar from './components/Sidebar';
 import UploadDialog from './components/UploadDialog';
 import ProjectList from './components/ProjectList';
 import BacklogDisplay from './components/BacklogDisplay';
+import SprintList from './components/SprintList';
+import BacklogEditModal from './components/BacklogEditModal';
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -17,7 +19,11 @@ function App() {
   const [error, setError] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [activeView, setActiveView] = useState('home');
-
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null); // Item to edit, null for new item
+  const [modalError, setModalError] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
   const drawerWidth = 240;
 
   //  ouvrir la modale si activeView === 'generator'
@@ -77,14 +83,14 @@ const handleProjectSelect = async (id, name) => {
   try {
     const res = await axios.get(`http://localhost:8080/api/projects/${id}`);
     
-    // Maintenant la réponse contient toutes les données nécessaires
     setBacklogData({
       project: res.data.projectName,
       backlog: res.data.backlogItems || [],
       assignments: res.data.assignments || {},
       execution_plan: res.data.executionPlan || {},
     });
-    
+
+    setSelectedProjectId(id);
     setActiveView('backlog');
   } catch (err) {
     console.error("Erreur lors du chargement du projet:", err);
@@ -93,6 +99,134 @@ const handleProjectSelect = async (id, name) => {
     setIsLoading(false);
   }
 };
+
+const handleUpdateBacklogItem = async (id, updatedItemData) => {
+    try {
+      const response = await axios.put(`http://localhost:8080/api/backlog/updateBacklog/${id}`, updatedItemData);
+      console.log("Backlog item mis à jour:", response.data);
+
+      // Mettre à jour l'état local du backlog
+      setBacklogData(prevData => {
+        const updatedBacklog = prevData.backlog.map(item =>
+          item.id === id ? response.data : item
+        );
+        return { ...prevData, backlog: updatedBacklog };
+      });
+      setError(null); // Clear any previous errors
+    } catch (err) {
+      console.error("Erreur lors de la mise à jour de l'élément de backlog:", err);
+      let errorMessage = "Erreur lors de la mise à jour de l'élément.";
+      if (err.response) {
+        errorMessage = `Erreur du serveur: ${err.response.status} - ${err.response.data.message || 'Une erreur est survenue.'}`;
+      } else if (err.request) {
+        errorMessage = "Impossible de joindre le backend. Vérifiez qu'il est démarré.";
+      } else {
+        errorMessage = `Erreur: ${err.message}`;
+      }
+      setError(errorMessage);
+      throw new Error(errorMessage); // Re-throw to be caught by modal
+    }
+  };
+  // Fonction pour ouvrir le modal d'édition/création pour un nouvel élément
+  const handleOpenCreateModal = () => {
+    setEditingItem(null); // Indique que c'est un nouvel élément
+    setIsEditModalOpen(true);
+    setModalError(null);
+  };
+
+  // Fonction pour gérer la sauvegarde (création ou mise à jour) depuis le modal
+  const handleSaveItem = async (itemData) => {
+    setModalLoading(true);
+    setModalError(null);
+    try {
+      if (itemData.id) {
+        // C'est une mise à jour
+        await handleUpdateBacklogItem(itemData.id, itemData);
+      } else {
+        // C'est une création
+        await handleCreateBacklogItem(itemData);
+      }
+      setIsEditModalOpen(false);
+      setEditingItem(null); // Réinitialiser après sauvegarde
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde de l'élément:", error);
+      setModalError(error.message || "Erreur lors de la sauvegarde de l'élément.");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  //  création d'un nouvel élément de backlog via l'API.
+  const handleCreateBacklogItem = async (newItemData) => {
+    if (!selectedProjectId) {
+      const msg = "Impossible de créer un élément de backlog sans un projet sélectionné.";
+      setError(msg);
+      throw new Error(msg);
+    }
+    try {
+      // L'ID sera généré par le backend s'il n'est pas fourni.
+      const response = await axios.post(`http://localhost:8080/api/backlog/project/${selectedProjectId}/addBacklog`, newItemData);
+      console.log("Nouvel élément de backlog créé:", response.data);
+
+      // Mettre à jour l'état local du backlog en ajoutant le nouvel élément
+      setBacklogData(prevData => ({
+        ...prevData,
+        backlog: [...(prevData.backlog || []), response.data]
+      }));
+      setError(null); // Clear any previous errors
+    } catch (err) {
+      console.error("Erreur lors de la création de l'élément de backlog:", err);
+      let errorMessage = "Erreur lors de la création de l'élément.";
+      if (err.response) {
+        errorMessage = `Erreur du serveur: ${err.response.status} - ${err.response.data.message || 'Une erreur est survenue.'}`;
+      } else if (err.request) {
+        errorMessage = "Impossible de joindre le backend. Vérifiez qu'il est démarré.";
+      } else {
+        errorMessage = `Erreur: ${err.message}`;
+      }
+      setError(errorMessage);
+      throw new Error(errorMessage); // Re-throw to be caught by modal
+    }
+  };
+
+  //Gère la suppression d'un élément de backlog via l'API.
+  const handleDeleteBacklogItem = async (id) => {
+    try {
+      await axios.delete(`http://localhost:8080/api/backlog/deleteBacklog/${id}`);
+      console.log("Backlog item supprimé:", id);
+
+      // Mettre à jour l'état local du backlog en filtrant l'élément supprimé
+      setBacklogData(prevData => {
+        const updatedBacklog = prevData.backlog.filter(item => item.id !== id);
+        return { ...prevData, backlog: updatedBacklog };
+      });
+      setError(null); // Clear any previous errors
+    } catch (err) {
+      console.error("Erreur lors de la suppression de l'élément de backlog:", err);
+      let errorMessage = "Erreur lors de la suppression de l'élément.";
+      if (err.response) {
+        errorMessage = `Erreur du serveur: ${err.response.status} - ${err.response.data.message || 'Une erreur est survenue.'}`;
+      } else if (err.request) {
+        errorMessage = "Impossible de joindre le backend. Vérifiez qu'il est démarré.";
+      } else {
+        errorMessage = `Erreur: ${err.message}`;
+      }
+      setError(errorMessage);
+      throw new Error(errorMessage); // Re-throw to be caught by component
+    }
+  };
+ // Préparer les options pour le Parent ID dropdown
+  const parentOptions = (backlogData?.backlog || [])
+    .filter(item => item.id !== editingItem?.id) // Exclure l'élément en cours d'édition
+    .map(item => ({ id: item.id, title: item.title }));
+
+  // Fonction pour ouvrir le modal de modification avec les données existantes
+  const handleEditBacklogItem = (item) => {
+    setEditingItem(item);         //  On remplit les infos dans la modale
+    setIsEditModalOpen(true);     //  On affiche la modale
+    setModalError(null);          //  Réinitialise l'erreur
+  };
+
 
 
 
@@ -137,7 +271,12 @@ const handleProjectSelect = async (id, name) => {
        {activeView === 'backlog' && backlogData && (
   <BacklogDisplay
     backlogData={backlogData}
-    onNewUploadClick={() => setActiveView('generator')}
+    onNewUploadClick={() => setActiveView('true')}
+    onUpdateBacklogItem={handleUpdateBacklogItem} //fonction de mise à jour
+    onDeleteBacklogItem={handleDeleteBacklogItem} //fonction de suppression
+    onCreateBacklogItem={handleOpenCreateModal}
+    onEditBacklogItem={handleEditBacklogItem}
+
   />
 )}
 
@@ -166,6 +305,28 @@ const handleProjectSelect = async (id, name) => {
         handleUpload={handleUpload}
         error={error}
       />
+       {/* Modal de modification / création */}
+      {isEditModalOpen && (
+        <BacklogEditModal
+          open={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          item={editingItem} // Sera null pour une création
+          onSave={handleSaveItem} // Gère la création et la mise à jour
+          isLoading={modalLoading}
+          error={modalError}
+          sprintNames={backlogData?.backlog ? Array.from(new Set(backlogData.backlog.map(item => item.suggestedSprintName).filter(name => name && name !== 'Non planifié'))) : []}
+          agentOptions={backlogData?.backlog ? Array.from(new Set(backlogData.backlog.map(item => item.assignedAgent).filter(agent => agent && agent !== 'Unassigned'))) : []}
+           parentOptions={parentOptions}
+        />
+      )}
+      {/* <SprintList
+      projectId={selectedProjectId}
+      onSprintClick={(sprint) => {
+      console.log('Sprint sélectionné :', sprint);
+    // Tu peux afficher un kanban ici
+  }}
+/> */}
+
     </Box>
   );
 }

@@ -37,7 +37,7 @@ function ProjectList({ onOpenGeneratorClick, onProjectSelect }) {
       setError(null); // Clear any previous errors
 
       try {
-        const response = await axios.get('http://localhost:8080/api/projects/listProjects'); // Your backend API endpoint
+        const response = await axios.get('http://localhost:8080/api/projects/listProjects'); // backend API endpoint
         // Assuming ProjectDTO has id, name, description, lastModified, status
         setProjects(response.data);
       } catch (err) {
