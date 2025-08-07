@@ -18,7 +18,7 @@ import { styled } from '@mui/material/styles';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 
-// Custom styled Paper for sections, similar to Azure DevOps cards
+// Custom styled Paper for sections
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   borderRadius: theme.shape.borderRadius,

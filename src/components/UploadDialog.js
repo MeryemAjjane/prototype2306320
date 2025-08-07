@@ -1,43 +1,36 @@
 import React from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Typography,
-  Box,
-  Input,
-  CircularProgress,
-  Alert,
-  IconButton
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, Typography, Box, Input, CircularProgress,
+  Alert, IconButton
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
 function UploadDialog({
-  open,
-  onClose,
-  selectedFile,
-  handleFileChange,
-  isLoading,
-  handleUpload,
-  error,
+  open, onClose, selectedFile, handleFileChange,
+  isLoading, handleUpload, error
 }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      
+      {/* En-tête du Dialog */}
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
           Importer un fichier PDF
-        </Typography>
-        <IconButton aria-label="close" onClick={onClose}>
+        <IconButton onClick={onClose}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
+
+      {/* Contenu du Dialog */}
       <DialogContent dividers>
         <Box sx={{ mb: 2 }}>
-          <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
+          
+          {/* Label */}
+          <Typography sx={{ fontWeight: 'bold', mb: 1 }}>
             Sélectionner un fichier :
           </Typography>
+
+          {/* Input fichier */}
           <Input
             type="file"
             inputProps={{ accept: ".pdf" }}
@@ -45,7 +38,7 @@ function UploadDialog({
             fullWidth
             sx={{
               '& .MuiInputBase-input': {
-                padding: '8px 12px',
+                p: '8px 12px',
                 border: '1px solid #e0e0e0',
                 borderRadius: '8px',
                 bgcolor: '#f8f8f8',
@@ -56,28 +49,32 @@ function UploadDialog({
                 borderRadius: '9999px',
                 border: 0,
                 fontSize: '0.875rem',
-                fontWeight: 'semibold',
-                bgcolor: '#e0e7ff', // Indigo 50
-                color: '#4f46e5', // Indigo 700
+                fontWeight: 'bold',
+                bgcolor: '#e0e7ff',
+                color: '#4f46e5',
                 cursor: 'pointer',
-                '&:hover': {
-                  bgcolor: '#c7d2fe', // Indigo 100
-                }
+                '&:hover': { bgcolor: '#c7d2fe' },
               }
             }}
           />
+
+          {/* Affiche le nom du fichier sélectionné */}
           {selectedFile && (
             <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
-              Fichier sélectionné: <Typography component="span" variant="inherit" sx={{ fontWeight: 'medium' }}>{selectedFile.name}</Typography>
+              Fichier sélectionné : <strong>{selectedFile.name}</strong>
             </Typography>
           )}
         </Box>
+
+        {/* Affiche une erreur s'il y'a */}
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}
           </Alert>
         )}
       </DialogContent>
+
+      {/* Bouton d’action */}
       <DialogActions sx={{ p: 2 }}>
         <Button
           onClick={handleUpload}
@@ -86,13 +83,13 @@ function UploadDialog({
           sx={{
             width: '100%',
             py: 1.5,
-            bgcolor: isLoading ? 'grey.400' : '#F5EFEB', // Green 600
-            '&:hover': { bgcolor: isLoading ? 'grey.400' : '#F5EFEB' }, // Green 700
-            fontSize: '1rem',
-            fontWeight: 'semibold',
-            color:'#2F4157'
+            bgcolor: isLoading ? 'grey.400' : '#F5EFEB',
+            '&:hover': { bgcolor: isLoading ? 'grey.400' : '#e0ddd8' },
+            color: '#2F4157',
+            fontWeight: 'bold'
           }}
         >
+          {/* Loader pendant l’envoi */}
           {isLoading ? (
             <CircularProgress size={24} sx={{ color: 'white', mr: 1 }} />
           ) : (

@@ -1,228 +1,461 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Typography,
   Box,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   List,
   ListItem,
   ListItemText,
-  Button,
+  ListItemIcon,
+  Collapse,
+  IconButton,
+  Chip,
+  Tooltip,
   Grid,
+  Button
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen'; // Epic
+import AssignmentIcon from '@mui/icons-material/Assignment'; // Feature
+import ArticleIcon from '@mui/icons-material/Article'; // User Story
+import TaskAltIcon from '@mui/icons-material/TaskAlt'; // Task
+import BugReportIcon from '@mui/icons-material/BugReport'; // Bug
+import PersonIcon from '@mui/icons-material/Person'; // Assigned Agent
+import AccessTimeIcon from '@mui/icons-material/AccessTime'; // Estimated Hours
+import ScheduleIcon from '@mui/icons-material/Schedule'; // Suggested Sprint
 
+// Custom styled Paper for sections, similar to Azure DevOps cards
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   borderRadius: theme.shape.borderRadius,
   boxShadow: theme.shadows[3],
   marginBottom: theme.spacing(4),
+  backgroundColor: '#ffffff', // White background
 }));
 
-function BacklogDisplay({ backlogData, onNewUploadClick, getPriorityColor, getStatusColor }) {
+// Utility functions for colors (keeping them here for self-containment)
+const getPriorityColor = (priority) => {
+  switch (priority?.toLowerCase?.()) {
+    case 'high':
+      return { bgcolor: '#ef4444', color: 'white' }; // Red 500
+    case 'medium':
+      return { bgcolor: '#eab308', color: 'white' }; // Yellow 500
+    case 'low':
+      return { bgcolor: '#22c55e', color: 'white' }; // Green 500
+    default:
+      return { bgcolor: '#9ca3af', color: 'white' }; // Gray 400
+  }
+};
+
+const getStatusColor = (status) => {
+  switch (status?.toLowerCase?.()) {
+    case 'todo':
+      return { bgcolor: '#6b7280', color: 'white' }; // Gray 600
+    case 'in progress':
+      return { bgcolor: '#2563eb', color: 'white' }; // Blue 600
+    case 'done':
+      return { bgcolor: '#10b981', color: 'white' }; // Emerald 500
+    case 'blocked':
+      return { bgcolor: '#dc2626', color: 'white' }; // Red 600
+    default:
+      return { bgcolor: '#9ca3af', color: 'white' }; // Gray 400
+  }
+};
+
+// Helper function to build the hierarchical structure
+const buildHierarchy = (items) => {
+  const itemMap = new Map(items.map(item => [item.id, { ...item, children: [] }]));
+  const rootItems = [];
+
+  itemMap.forEach(item => {
+    if (item.parentId && itemMap.has(item.parentId)) {
+      itemMap.get(item.parentId).children.push(item);
+    } else {
+      rootItems.push(item);
+    }
+  });
+
+  // Sort children by task type (Epic, Feature, User Story, Task, Bug) and then by priority
+  const sortChildren = (children) => {
+    const order = {
+      'epic': 1,
+      'feature': 2,
+      'user_story': 3,
+      'task': 4,
+      'bug': 5
+    };
+    const priorityOrder = {
+      'high': 1,
+      'medium': 2,
+      'low': 3
+    };
+
+    return children.sort((a, b) => {
+      const typeA = order[a.taskType?.toLowerCase?.()] || 99;
+      const typeB = order[b.taskType?.toLowerCase?.()] || 99;
+      if (typeA !== typeB) return typeA - typeB;
+
+      const priorityA = priorityOrder[a.priority?.toLowerCase?.()] || 99;
+      const priorityB = priorityOrder[b.priority?.toLowerCase?.()] || 99;
+      return priorityA - priorityB;
+    }).map(item => ({ ...item, children: sortChildren(item.children) })); // Recursively sort children
+  };
+
+  return sortChildren(rootItems);
+};
+
+
+// Recursive component to render each backlog item and its children
+const BacklogItem = ({ item, level = 0, getPriorityColor, getStatusColor }) => {
+  const [open, setOpen] = useState(false);
+
+  const handleClick = () => {
+    if (item.children && item.children.length > 0) {
+      setOpen(!open);
+    }
+  };
+
+ const getIconForTaskType = (taskType) => {
+  switch (taskType?.toLowerCase?.()) {
+    case 'epic':
+      return <FolderOpenIcon sx={{ color: '#4f46e5' }} />;
+    case 'feature':
+      return <AssignmentIcon sx={{ color: '#059669' }} />;
+    case 'user_story':
+      return <ArticleIcon sx={{ color: '#f59e0b' }} />;
+    case 'task':
+      return <TaskAltIcon sx={{ color: '#3b82f6' }} />;
+    case 'bug':
+      return <BugReportIcon sx={{ color: '#ef4444' }} />;
+    default:
+      return <ArticleIcon sx={{ color: '#9ca3af' }} />;
+  }
+};
+
   return (
     <>
-      {backlogData ? (
-        <StyledPaper elevation={3}>
-          <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', mb: 3, pb: 2, borderBottom: '1px solid #e0e0e0' }}>
-            Backlog pour le Projet : <Typography component="span" variant="inherit" sx={{ color: '#4f46e5' }}>{backlogData.project}</Typography>
-          </Typography>
-
-          <Typography variant="h6" component="h3" sx={{ fontWeight: 'semibold', mb: 2, mt: 3, color: 'text.secondary' }}>
-            Éléments du Backlog ({backlogData.backlog.length}) :
-          </Typography>
-          <TableContainer component={Paper} sx={{ mb: 4, border: '1px solid #e0e0e0' }}>
-            <Table sx={{ minWidth: 650 }} aria-label="backlog table">
-              <TableHead sx={{ bgcolor: '#f9fafb' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'medium', fontSize: '0.75rem', textTransform: 'uppercase', color: 'text.secondary' }}>Titre</TableCell>
-                  <TableCell sx={{ fontWeight: 'medium', fontSize: '0.75rem', textTransform: 'uppercase', color: 'text.secondary' }}>Description</TableCell>
-                  <TableCell sx={{ fontWeight: 'medium', fontSize: '0.75rem', textTransform: 'uppercase', color: 'text.secondary' }}>Priorité</TableCell>
-                  <TableCell sx={{ fontWeight: 'medium', fontSize: '0.75rem', textTransform: 'uppercase', color: 'text.secondary' }}>Type</TableCell>
-                  <TableCell sx={{ fontWeight: 'medium', fontSize: '0.75rem', textTransform: 'uppercase', color: 'text.secondary' }}>Estimé (h)</TableCell>
-                  <TableCell sx={{ fontWeight: 'medium', fontSize: '0.75rem', textTransform: 'uppercase', color: 'text.secondary' }}>Assigné à</TableCell>
-                  <TableCell sx={{ fontWeight: 'medium', fontSize: '0.75rem', textTransform: 'uppercase', color: 'text.secondary' }}>Statut</TableCell>
-                  <TableCell sx={{ fontWeight: 'medium', fontSize: '0.75rem', textTransform: 'uppercase', color: 'text.secondary' }}>Suggéré par</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {backlogData.backlog.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ color: 'text.secondary' }}>
-                      Aucun élément de backlog trouvé.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  backlogData.backlog.map((item) => (
-                    <TableRow key={item.id} hover>
-                      <TableCell component="th" scope="row" sx={{ fontWeight: 'medium', color: 'text.primary', width: '16.66%' }}>
-                        {item.title}
-                      </TableCell>
-                      <TableCell sx={{ color: 'text.secondary', width: '33.33%' }}>{item.description}</TableCell>
-                      <TableCell>
-                        <Box
-                          component="span"
-                          sx={{
-                            ...getPriorityColor(item.priority),
-                            px: 1, py: 0.5, borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'semibold', display: 'inline-flex'
-                          }}
-                        >
-                          {item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ color: 'text.secondary' }}>
-                        {item.task_type.replace(/_/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                      </TableCell>
-                      <TableCell sx={{ color: 'text.secondary' }}>{item.estimatedHours}h</TableCell>
-                      <TableCell sx={{ color: 'text.secondary' }}>{item.assigned_agent || 'Non Assigné'}</TableCell>
-                      <TableCell>
-                        <Box
-                          component="span"
-                          sx={{
-                            ...getStatusColor(item.status),
-                            px: 1, py: 0.5, borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'semibold', display: 'inline-flex'
-                          }}
-                        >
-                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ color: 'text.secondary' }}>{item.suggested_by}</TableCell>
-                    </TableRow>
-                  ))
+      <ListItem
+        sx={{
+          pl: level * 4, // Indentation based on level
+          borderBottom: '1px solid #e0e0e0',
+          '&:hover': { bgcolor: '#f5f5f5' },
+          cursor: 'pointer',
+        }}
+        onClick={handleClick}
+      >
+        <ListItemIcon>
+          {getIconForTaskType(item.taskType)}
+        </ListItemIcon>
+        <ListItemText
+          primary={
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography variant="body1" component="span" sx={{ fontWeight: 'medium', mr: 1 }}>
+                {item.title || 'Titre manquant'}
+              </Typography>
+              <Chip
+              label={item.taskType?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}
+                size="small"
+                sx={{ mr: 1, bgcolor: '#e0e7ff', color: '#4f46e5', fontWeight: 'bold' }} // Light indigo chip
+              />
+              <Chip
+                label={(item.priority || 'unknown').toUpperCase()}
+                size="small"
+                sx={{ ...getPriorityColor(item.priority), fontWeight: 'bold' }}
+              />
+            </Box>
+          }
+          secondary={
+            <Box sx={{ mt: 0.5, color: 'text.secondary', fontSize: '0.875rem' }}>
+              <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
+                {item.description || 'Description non disponible'}
+              </Typography>
+              <Grid container spacing={1} sx={{ mt: 1 }}>
+                {item.assignedAgent && (
+                  <Grid item>
+                    <Chip
+                      icon={<PersonIcon sx={{ fontSize: 16 }} />}
+                      label={item.assignedAgent}
+                      size="small"
+                      sx={{ bgcolor: '#f0f9ff', color: '#0c4a6e', fontWeight: 'medium' }} // Light blue chip
+                    />
+                  </Grid>
                 )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          {/* Section Assignations des Agents */}
-          <Typography variant="h6" component="h3" sx={{ fontWeight: 'semibold', mb: 2, mt: 4, pb: 1, borderBottom: '1px solid #e0e0e0', color: 'text.secondary' }}>
-            Assignations des Agents :
-          </Typography>
-          {backlogData.assignments && Object.keys(backlogData.assignments).length > 0 ? (
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              {Object.entries(backlogData.assignments).map(([agentName, tasks]) => (
-                <Grid item xs={12} md={6} key={agentName}>
-                  <Paper elevation={1} sx={{ p: 3, bgcolor: '#f0f4f8', border: '1px solid #e0e0e0' }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1.5, color: 'text.primary' }}>{agentName}</Typography>
-                    {tasks.length > 0 ? (
-                      <List dense sx={{ listStyleType: 'disc', pl: 2 }}>
-                        {tasks.map(task => (
-                          <ListItem key={task.id} sx={{ display: 'list-item', pl: 0 }}>
-                            <ListItemText primary={`${task.title} (Type: ${task.task_type.replace(/_/g, ' ').toLowerCase()}, Est: ${task.estimatedHours}h)`}
-                              primaryTypographyProps={{ fontSize: '0.875rem', color: 'text.secondary' }} />
-                          </ListItem>
-                        ))}
-                      </List>
-                    ) : (
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucune tâche assignée.</Typography>
-                    )}
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 4 }}>Aucune assignation d'agent trouvée.</Typography>
-          )}
-
-          {/* Section Plan d'Exécution et Artefacts */}
-          <Typography variant="h6" component="h3" sx={{ fontWeight: 'semibold', mb: 2, mt: 4, pb: 1, borderBottom: '1px solid #e0e0e0', color: 'text.secondary' }}>
-            Plan d'Exécution et Artefacts :
-          </Typography>
-          {backlogData.execution_plan && Object.keys(backlogData.execution_plan).length > 0 ? (
-            <Grid container spacing={3}> {/* Changed Stack to Grid for consistent spacing */}
-              {Object.entries(backlogData.execution_plan).map(([agentName, plan]) => (
-                <Grid item xs={12} key={agentName}> {/* Each plan item takes full width for consistency with previous Stack behavior */}
-                  <Paper elevation={1} sx={{ p: 3, bgcolor: '#e3f2fd', borderLeft: '4px solid #2196f3' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1, color: 'text.primary' }}>{agentName}</Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>Total Heures : <Typography component="span" variant="body2" sx={{ fontWeight: 'semibold' }}>{plan.total_hours}h</Typography></Typography>
-                    {plan.artifacts && plan.artifacts.length > 0 && (
-                      <Box sx={{ mt: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'semibold', mb: 1, color: 'text.secondary' }}>Artefacts Générés :</Typography>
-                        <List dense sx={{ listStyleType: 'disc', pl: 2 }}>
-                          {plan.artifacts.map((artifact, idx) => (
-                            <ListItem key={idx} sx={{ display: 'list-item', pl: 0 }}>
-                              <ListItemText
-                                primary={
-                                  <>
-                                    <Typography component="span" variant="body2" sx={{ fontWeight: 'medium' }}>Type:</Typography> {artifact.type.charAt(0).toUpperCase() + artifact.type.slice(1)},
-                                    <Typography component="span" variant="body2" sx={{ fontWeight: 'medium', ml: 1 }}>Description:</Typography> {artifact.description},
-                                    <Typography component="span" variant="body2" sx={{ fontWeight: 'medium', ml: 1 }}>Fichiers:</Typography> {artifact.files.join(', ')}
-                                  </>
-                                }
-                                primaryTypographyProps={{ fontSize: '0.875rem', color: 'text.secondary' }}
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Box>
-                    )}
-                    {(!plan.artifacts || plan.artifacts.length === 0) && (
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucun artefact généré pour cet agent.</Typography>
-                    )}
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucun plan d'exécution trouvé.</Typography>
-          )}
-
-          <Button
-            variant="outlined"
-            startIcon={<UploadFileIcon />}
-            onClick={onNewUploadClick}
-            sx={{
-              mt: 5,
-              py: 1.5,
-              px: 3,
-              bgcolor: '#2563eb', // Blue 600
-              color: 'white',
-              borderColor: '#2563eb',
-              '&:hover': {
-                bgcolor: '#1d4ed8', // Blue 700
-                borderColor: '#1d4ed8'
-              },
-              fontSize: '1rem',
-              fontWeight: 'semibold',
-              mx: 'auto',
-              display: 'flex'
-            }}
-          >
-            Upload d'un nouveau Cahier des Charges
-          </Button>
-        </StyledPaper>
-      ) : (
-        <StyledPaper elevation={3} sx={{ textAlign: 'center', maxWidth: 600, mx: 'auto', mt: 4 }}>
-          <Typography variant="h5" component="h3" gutterBottom sx={{ fontWeight: 'semibold', color: 'text.secondary' }}>
-            Aucune donnée de backlog disponible.
-          </Typography>
-          <Typography variant="body1" sx={{ color: 'text.secondary', mb: 4 }}>
-            Veuillez importer un fichier PDF via le "Générateur PDF" pour afficher le backlog.
-          </Typography>
-          <Button
-            variant="contained"
-            onClick={onNewUploadClick} // Using onNewUploadClick to go to generator
-            sx={{
-              py: 1.5,
-              px: 3,
-              bgcolor: '#C7D9E5',
-              '&:hover': { bgcolor: '#1d4ed8' },
-              fontSize: '1rem',
-              color:'#2F4157',
-              fontWeight: 'semibold',
-            }}
-          >
-            Aller au Générateur
-          </Button>
-        </StyledPaper>
+                {item.estimatedHours && (
+                  <Grid item>
+                    <Chip
+                      icon={<AccessTimeIcon sx={{ fontSize: 16 }} />}
+                      label={`${item.estimatedHours}h`}
+                      size="small"
+                      sx={{ bgcolor: '#ecfdf5', color: '#065f46', fontWeight: 'medium' }} // Light green chip
+                    />
+                  </Grid>
+                )}
+                {item.status && (
+                  <Grid item>
+                    <Chip
+                      label={item.status.toUpperCase()}
+                      size="small"
+                      sx={{ ...getStatusColor(item.status), fontWeight: 'bold' }}
+                    />
+                  </Grid>
+                )}
+                {item.suggestedSprintName && (
+                  <Grid item>
+                    <Chip
+                      icon={<ScheduleIcon sx={{ fontSize: 16 }} />}
+                      label={item.suggestedSprintName}
+                      size="small"
+                      sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 'medium' }} // Light orange chip
+                    />
+                  </Grid>
+                )}
+                {item.parentId && (
+                  <Grid item>
+                    <Tooltip title={`Parent ID: ${item.parentId}`}>
+                      <Chip
+                        label="Sub-item"
+                        size="small"
+                        sx={{ bgcolor: '#e0f2fe', color: '#0288d1', fontWeight: 'medium' }} // Light blue
+                      />
+                    </Tooltip>
+                  </Grid>
+                )}
+              </Grid>
+            </Box>
+          }
+        />
+        {item.children && item.children.length > 0 && (
+          <IconButton onClick={handleClick} size="small">
+            {open ? <ExpandLess /> : <ExpandMore />}
+          </IconButton>
+        )}
+      </ListItem>
+      {item.children && item.children.length > 0 && (
+        <Collapse in={open} timeout="auto" unmountOnExit>
+          <List component="div" disablePadding>
+            {item.children.map(child => (
+              <BacklogItem
+                key={child.id}
+                item={child}
+                level={level + 1}
+                getPriorityColor={getPriorityColor}
+                getStatusColor={getStatusColor}
+              />
+            ))}
+          </List>
+        </Collapse>
       )}
     </>
+  );
+};
+
+
+function BacklogDisplay({ backlogData, onNewUploadClick }) {
+  if (!backlogData || !backlogData.backlog || backlogData.backlog.length === 0) {
+    return (
+      <StyledPaper elevation={3} sx={{ textAlign: 'center', maxWidth: 600, mx: 'auto', mt: 4 }}>
+        <Typography variant="h5" component="h3" gutterBottom sx={{ fontWeight: 'semibold', color: 'text.secondary' }}>
+          Aucune donnée de backlog disponible.
+        </Typography>
+        <Typography variant="body1" sx={{ color: 'text.secondary', mb: 4 }}>
+          Veuillez importer un fichier PDF via le "Générateur PDF" pour afficher le backlog.
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={onNewUploadClick}
+          sx={{
+            py: 1.5,
+            px: 3,
+            bgcolor: '#C7D9E5',
+            '&:hover': { bgcolor: '#1d4ed8' },
+            fontSize: '1rem',
+            color:'#2F4157',
+            fontWeight: 'semibold',
+          }}
+        >
+          Upload d'un nouveau Cahier des Charges
+        </Button>
+      </StyledPaper>
+    );
+  }
+
+  const hierarchicalBacklog = buildHierarchy(backlogData.backlog);
+
+  return (
+    <StyledPaper elevation={3}>
+      <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', mb: 3, pb: 2, borderBottom: '1px solid #e0e0e0' }}>
+        Backlog pour le Projet : <Typography component="span" variant="inherit" sx={{ color: '#4f46e5' }}>{backlogData.project || 'Projet Sans Nom'}</Typography>
+      </Typography>
+
+      <Typography variant="h6" component="h3" sx={{ fontWeight: 'semibold', mb: 2, mt: 3, color: 'text.secondary' }}>
+        Éléments du Backlog ({backlogData.backlog.length}) :
+      </Typography>
+
+      <List
+        sx={{
+          width: '100%',
+          bgcolor: 'background.paper',
+          border: '1px solid #e0e0e0',
+          borderRadius: 2,
+          overflow: 'hidden',
+        }}
+      >
+        {hierarchicalBacklog.map(item => (
+          <BacklogItem
+            key={item.id}
+            item={item}
+            getPriorityColor={getPriorityColor}
+            getStatusColor={getStatusColor}
+          />
+        ))}
+      </List>
+
+      {/* Display Assignments and Execution Plan */}
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h6" component="h3" sx={{ fontWeight: 'semibold', mb: 2, color: 'text.secondary' }}>
+          Assignations des Agents :
+        </Typography>
+        {backlogData.assignments && Object.keys(backlogData.assignments).length > 0 ? (
+          <Grid container spacing={2}>
+            {Object.entries(backlogData.assignments).map(([agentName, tasks]) => (
+              <Grid item xs={12} md={6} key={agentName}>
+                <StyledPaper elevation={2} sx={{ p: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1, color: '#2F4157' }}>
+                    {agentName} ({Array.isArray(tasks) ? tasks.length : 0} tâches)
+                  </Typography>
+                  <List dense>
+                    {Array.isArray(tasks) && tasks.length > 0 ? (
+                      tasks.map(task => (
+                        <ListItem key={task.id || Math.random()} disablePadding sx={{ py: 0.5 }}>
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 'medium', mr: 1 }}>
+                                  {task.title || 'Titre manquant'}
+                                </Typography>
+                                <Chip
+                                 label={task.taskType?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}
+                                  size="small"
+                                  sx={{ mr: 0.5, bgcolor: '#e0e7ff', color: '#4f46e5' }}
+                                />
+                                <Chip
+                                  label={(task.priority || 'unknown').toUpperCase()}
+                                  size="small"
+                                  sx={{ ...getPriorityColor(task.priority) }}
+                                />
+                              </Box>
+                            }
+                            secondary={
+                              <Typography variant="caption" color="text.secondary">
+                                {task.description && typeof task.description === 'string' 
+                                  ? `${task.description.substring(0, 70)}...`
+                                  : 'Description non disponible'}
+                                {task.suggestedSprintName && ` | Sprint: ${task.suggestedSprintName}`}
+                              </Typography>
+                            }
+                          />
+                        </ListItem>
+                      ))
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                        Aucune tâche assignée.
+                      </Typography>
+                    )}
+                  </List>
+                </StyledPaper>
+              </Grid>
+            ))}
+          </Grid>
+        ) : (
+          <Typography variant="body1" color="text.secondary">
+            Aucune assignation d'agent disponible.
+          </Typography>
+        )}
+      </Box>
+
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h6" component="h3" sx={{ fontWeight: 'semibold', mb: 2, color: 'text.secondary' }}>
+          Plan d'Exécution et Artefacts :
+        </Typography>
+        {backlogData.execution_plan && Object.keys(backlogData.execution_plan).length > 0 ? (
+          <Grid container spacing={2}>
+            {Object.entries(backlogData.execution_plan).map(([agentName, plan]) => (
+              <Grid item xs={12} md={6} key={agentName}>
+                <StyledPaper elevation={2} sx={{ p: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1, color: '#2F4157' }}>
+                    {agentName} (Total Heures: {plan.total_hours || 0}h)
+                  </Typography>
+                  <Typography variant="subtitle2" sx={{ mt: 1, mb: 1, color: 'text.secondary' }}>
+                    Tâches Exécutables:
+                  </Typography>
+                  <List dense>
+                      {plan.tasks && Array.isArray(plan.tasks) && plan.tasks.length > 0 ? (
+                        plan.tasks.map((task, index) => (
+                          <ListItem key={task.id || index} disablePadding sx={{ py: 0.5 }}>
+                            <ListItemText
+                              primary={
+                                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                  {task.title || 'Titre manquant'} ({task.estimatedHours || 0}h)
+                                </Typography>
+                              }
+                              secondary={
+                                <Typography variant="caption" color="text.secondary">
+                                  {task.description && typeof task.description === 'string'
+                                    ? `${task.description.substring(0, 70)}...`
+                                    : 'Description non disponible'}
+                                </Typography>
+                              }
+                            />
+                          </ListItem>
+                        ))
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                          Aucune tâche exécutable assignée.
+                        </Typography>
+                      )}
+                    </List>
+
+                  <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, color: 'text.secondary' }}>
+                    Artefacts Générés:
+                  </Typography>
+                 <List dense>
+                      {plan.artifacts && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 ? (
+                        plan.artifacts.map((artifact, index) => (
+                          <ListItem key={index} disablePadding sx={{ py: 0.5 }}>
+                            <ListItemText
+                              primary={
+                                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                  {artifact.description || 'Description manquante'} (Type: {artifact.type || 'Non défini'})
+                                </Typography>
+                              }
+                              secondary={
+                                <Typography variant="caption" color="text.secondary">
+                                  Fichiers: {(Array.isArray(artifact.files) ? artifact.files.join(', ') : 'Aucun fichier')}
+                                </Typography>
+                              }
+                            />
+                          </ListItem>
+                        ))
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                          Aucun artefact généré.
+                        </Typography>
+                      )}
+                    </List>
+
+                </StyledPaper>
+              </Grid>
+            ))}
+          </Grid>
+        ) : (
+          <Typography variant="body1" color="text.secondary">
+            Aucun plan d'exécution disponible.
+          </Typography>
+          )}
+      </Box>
+    </StyledPaper>
   );
 }
 
