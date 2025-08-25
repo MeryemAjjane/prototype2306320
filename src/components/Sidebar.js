@@ -21,7 +21,6 @@ const menuItems = [
   { key: 'generator', label: 'Générateur PDF', icon: <UploadFileIcon /> },
   { key: 'backlog', label: 'Backlog du Projet', icon: <StorageIcon /> },
   { key: 'projects', label: 'Liste de Projet', icon: <StorageIcon /> },
-  { key: 'collapse', label: 'Liste', icon: <StorageIcon /> },
 ];
 
 

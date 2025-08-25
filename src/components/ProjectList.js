@@ -12,11 +12,15 @@ import {
   Divider,
   Button,
   CircularProgress, // For loading indicator
-  Alert // For error display
+  Alert, // For error display
+  Stack,
+  Chip
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import ViewKanbanIcon from '@mui/icons-material/ViewKanban';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 
 // Custom styled Paper for sections
 const StyledPaper = styled(Paper)(({ theme }) => ({
@@ -26,7 +30,7 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   marginBottom: theme.spacing(4),
 }));
 
-function ProjectList({ onOpenGeneratorClick, onProjectSelect }) {
+function ProjectList({ onOpenGeneratorClick, onProjectSelect, onKanbanClick }) {
   const [projects, setProjects] = useState([]); // State to store fetched projects
   const [isLoading, setIsLoading] = useState(true); // Loading state
   const [error, setError] = useState(null); // Error state
@@ -56,6 +60,20 @@ function ProjectList({ onOpenGeneratorClick, onProjectSelect }) {
 
     fetchProjects(); // Call the fetch function when the component mounts
   }, []); // Empty dependency array means this runs once on mount
+
+  // Fonction pour gérer le clic sur le bouton Backlog
+  const handleBacklogClick = (e, project) => {
+    e.stopPropagation(); // Empêche la propagation vers le ListItemButton
+    onProjectSelect(project.id, project.projectName);
+  };
+
+  // Fonction pour gérer le clic sur le bouton Kanban
+  const handleKanbanClick = (e, project) => {
+    e.stopPropagation(); // Empêche la propagation vers le ListItemButton
+    if (onKanbanClick) {
+      onKanbanClick(project.id, project.projectName);
+    }
+  };
 
   return (
     <StyledPaper elevation={3}>
@@ -91,22 +109,64 @@ function ProjectList({ onOpenGeneratorClick, onProjectSelect }) {
           {projects.map((project, index) => (
             <React.Fragment key={project.id}>
               <ListItem disablePadding>
-                <ListItemButton onClick={() => onProjectSelect(project.id, project.projectName)}>
-                  <ListItemIcon>
-                    <FolderOpenIcon sx={{ color: '#4f46e5' }} />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={project.projectName}
-                   secondary={
-                           <Box component="span" sx={{ display: 'block', color: 'text.secondary', fontSize: '0.875rem' }}>
-                                <Typography component="span" variant="body2" sx={{ fontSize: '0.75rem', color: 'text.disabled', mt: 0.5 }}>
-                                 Last modified: {new Date(project.updatedAt).toLocaleDateString()}
-                             </Typography>
-                  </Box>
-                    }
-                   primaryTypographyProps={{ fontWeight: 'medium', fontSize: '1.1rem' }}
-                  />
-                </ListItemButton>
+                <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
+                  {/* Zone principale cliquable du projet */}
+                  <ListItemButton 
+                    sx={{ flexGrow: 1, mr: 2 }}
+                    onClick={() => onProjectSelect(project.id, project.projectName)}
+                  >
+                    <ListItemIcon>
+                      <FolderOpenIcon sx={{ color: '#4f46e5' }} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={project.projectName}
+                      secondary={
+                        <Box component="span" sx={{ display: 'block', color: 'text.secondary', fontSize: '0.875rem' }}>
+                          <Typography component="span" variant="body2" sx={{ fontSize: '0.75rem', color: 'text.disabled', mt: 0.5 }}>
+                            Last modified: {new Date(project.updatedAt).toLocaleDateString()}
+                          </Typography>
+                        </Box>
+                      }
+                      primaryTypographyProps={{ fontWeight: 'medium', fontSize: '1.1rem' }}
+                    />
+                  </ListItemButton>
+                  
+                  {/* Boutons d'action */}
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<ListAltIcon />}
+                      onClick={(e) => handleBacklogClick(e, project)}
+                      sx={{
+                        borderColor: '#10b981',
+                        color: '#10b981',
+                        '&:hover': {
+                          borderColor: '#059669',
+                          bgcolor: '#f0fdf4'
+                        }
+                      }}
+                    >
+                      Backlog
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<ViewKanbanIcon />}
+                      onClick={(e) => handleKanbanClick(e, project)}
+                      sx={{
+                        borderColor: '#f59e0b',
+                        color: '#f59e0b',
+                        '&:hover': {
+                          borderColor: '#d97706',
+                          bgcolor: '#fffbeb'
+                        }
+                      }}
+                    >
+                      Sprints
+                    </Button>
+                  </Stack>
+                </Box>
               </ListItem>
               {index < projects.length - 1 && <Divider component="li" />}
             </React.Fragment>

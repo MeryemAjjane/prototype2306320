@@ -20,13 +20,14 @@ function App() {
   const [openDialog, setOpenDialog] = useState(false);
   const [activeView, setActiveView] = useState('home');
   const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [selectedProjectName, setSelectedProjectName] = useState(null); // Ajouté pour stocker le nom du projet
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null); // Item to edit, null for new item
   const [modalError, setModalError] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
   const drawerWidth = 240;
 
-  //  ouvrir la modale si activeView === 'generator'
+  // Ouvrir la modale si activeView === 'generator'
   useEffect(() => {
     if (activeView === 'generator') {
       setOpenDialog(true);
@@ -76,31 +77,40 @@ function App() {
     setBacklogData(null);
     setError(null);
   };
+
   // Fonction corrigée pour gérer la sélection de projet
-const handleProjectSelect = async (id, name) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    const res = await axios.get(`http://localhost:8080/api/projects/${id}`);
-    
-    setBacklogData({
-      project: res.data.projectName,
-      backlog: res.data.backlogItems || [],
-      assignments: res.data.assignments || {},
-      execution_plan: res.data.executionPlan || {},
-    });
+  const handleProjectSelect = async (id, name) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get(`http://localhost:8080/api/projects/${id}`);
+      
+      setBacklogData({
+        project: res.data.projectName,
+        backlog: res.data.backlogItems || [],
+        assignments: res.data.assignments || {},
+        execution_plan: res.data.executionPlan || {},
+      });
 
-    setSelectedProjectId(id);
-    setActiveView('backlog');
-  } catch (err) {
-    console.error("Erreur lors du chargement du projet:", err);
-    setError("Erreur pendant le chargement du projet.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+      setSelectedProjectId(id);
+      setSelectedProjectName(name);
+      setActiveView('backlog');
+    } catch (err) {
+      console.error("Erreur lors du chargement du projet:", err);
+      setError("Erreur pendant le chargement du projet.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-const handleUpdateBacklogItem = async (id, updatedItemData) => {
+  // Nouvelle fonction pour gérer la navigation vers le Kanban
+  const handleKanbanClick = (projectId, projectName) => {
+    setSelectedProjectId(projectId);
+    setSelectedProjectName(projectName);
+    setActiveView('kanban');
+  };
+
+  const handleUpdateBacklogItem = async (id, updatedItemData) => {
     try {
       const response = await axios.put(`http://localhost:8080/api/backlog/updateBacklog/${id}`, updatedItemData);
       console.log("Backlog item mis à jour:", response.data);
@@ -127,6 +137,7 @@ const handleUpdateBacklogItem = async (id, updatedItemData) => {
       throw new Error(errorMessage); // Re-throw to be caught by modal
     }
   };
+
   // Fonction pour ouvrir le modal d'édition/création pour un nouvel élément
   const handleOpenCreateModal = () => {
     setEditingItem(null); // Indique que c'est un nouvel élément
@@ -156,7 +167,7 @@ const handleUpdateBacklogItem = async (id, updatedItemData) => {
     }
   };
 
-  //  création d'un nouvel élément de backlog via l'API.
+  // Création d'un nouvel élément de backlog via l'API.
   const handleCreateBacklogItem = async (newItemData) => {
     if (!selectedProjectId) {
       const msg = "Impossible de créer un élément de backlog sans un projet sélectionné.";
@@ -189,7 +200,7 @@ const handleUpdateBacklogItem = async (id, updatedItemData) => {
     }
   };
 
-  //Gère la suppression d'un élément de backlog via l'API.
+  // Gère la suppression d'un élément de backlog via l'API.
   const handleDeleteBacklogItem = async (id) => {
     try {
       await axios.delete(`http://localhost:8080/api/backlog/deleteBacklog/${id}`);
@@ -215,20 +226,18 @@ const handleUpdateBacklogItem = async (id, updatedItemData) => {
       throw new Error(errorMessage); // Re-throw to be caught by component
     }
   };
- // Préparer les options pour le Parent ID dropdown
+
+  // Préparer les options pour le Parent ID dropdown
   const parentOptions = (backlogData?.backlog || [])
     .filter(item => item.id !== editingItem?.id) // Exclure l'élément en cours d'édition
     .map(item => ({ id: item.id, title: item.title }));
 
   // Fonction pour ouvrir le modal de modification avec les données existantes
   const handleEditBacklogItem = (item) => {
-    setEditingItem(item);         //  On remplit les infos dans la modale
-    setIsEditModalOpen(true);     //  On affiche la modale
-    setModalError(null);          //  Réinitialise l'erreur
+    setEditingItem(item);         // On remplit les infos dans la modale
+    setIsEditModalOpen(true);     // On affiche la modale
+    setModalError(null);          // Réinitialise l'erreur
   };
-
-
-
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -262,24 +271,35 @@ const handleUpdateBacklogItem = async (id, updatedItemData) => {
         {error && <Alert severity="error">{error}</Alert>}
 
         {activeView === 'projects' && (
-         <ProjectList
-    onOpenGeneratorClick={() => setActiveView('generator')}
-    onProjectSelect={handleProjectSelect}
-  />
+          <ProjectList
+            onOpenGeneratorClick={() => setActiveView('generator')}
+            onProjectSelect={handleProjectSelect}
+            onKanbanClick={handleKanbanClick}
+          />
         )}
 
-       {activeView === 'backlog' && backlogData && (
-  <BacklogDisplay
-    backlogData={backlogData}
-    onNewUploadClick={() => setActiveView('true')}
-    onUpdateBacklogItem={handleUpdateBacklogItem} //fonction de mise à jour
-    onDeleteBacklogItem={handleDeleteBacklogItem} //fonction de suppression
-    onCreateBacklogItem={handleOpenCreateModal}
-    onEditBacklogItem={handleEditBacklogItem}
+        {activeView === 'backlog' && backlogData && (
+          <BacklogDisplay
+            backlogData={backlogData}
+            onNewUploadClick={() => setActiveView('generator')}
+            onUpdateBacklogItem={handleUpdateBacklogItem}
+            onDeleteBacklogItem={handleDeleteBacklogItem}
+            onCreateBacklogItem={handleOpenCreateModal}
+            onEditBacklogItem={handleEditBacklogItem}
+          />
+        )}
 
-  />
-)}
-
+        {/* Nouvelle vue Kanban */}
+        {activeView === 'kanban' && selectedProjectId && (
+          <SprintList
+            projectId={selectedProjectId}
+            projectName={selectedProjectName}
+            onSprintClick={(sprint) => {
+              console.log('Sprint sélectionné :', sprint);
+              // Vous pouvez ajouter ici la navigation vers un tableau Kanban détaillé
+            }}
+          />
+        )}
 
         {activeView === 'home' && (
           <Box sx={{ textAlign: 'center', mt: 4 }}>
@@ -305,7 +325,8 @@ const handleUpdateBacklogItem = async (id, updatedItemData) => {
         handleUpload={handleUpload}
         error={error}
       />
-       {/* Modal de modification / création */}
+
+      {/* Modal de modification / création */}
       {isEditModalOpen && (
         <BacklogEditModal
           open={isEditModalOpen}
@@ -316,17 +337,9 @@ const handleUpdateBacklogItem = async (id, updatedItemData) => {
           error={modalError}
           sprintNames={backlogData?.backlog ? Array.from(new Set(backlogData.backlog.map(item => item.suggestedSprintName).filter(name => name && name !== 'Non planifié'))) : []}
           agentOptions={backlogData?.backlog ? Array.from(new Set(backlogData.backlog.map(item => item.assignedAgent).filter(agent => agent && agent !== 'Unassigned'))) : []}
-           parentOptions={parentOptions}
+          parentOptions={parentOptions}
         />
       )}
-      {/* <SprintList
-      projectId={selectedProjectId}
-      onSprintClick={(sprint) => {
-      console.log('Sprint sélectionné :', sprint);
-    // Tu peux afficher un kanban ici
-  }}
-/> */}
-
     </Box>
   );
 }
